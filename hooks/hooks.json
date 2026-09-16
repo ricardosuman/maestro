@@ -1,0 +1,11 @@
+{
+  "description": "maestro usage gate: injects Claude usage/mode into each prompt and blocks opus/sonnet lanes when the 5h window is ≥ 75%",
+  "hooks": {
+    "UserPromptSubmit": [
+      { "hooks": [ { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/usage-gate.sh\" context", "timeout": 5 } ] }
+    ],
+    "PreToolUse": [
+      { "matcher": "Agent|Task", "hooks": [ { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/usage-gate.sh\" gate", "timeout": 5 } ] }
+    ]
+  }
+}

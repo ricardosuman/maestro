@@ -1,0 +1,17 @@
+{
+  "name": "maestro",
+  "metadata": {
+    "description": "Model-routing patterns for Claude Code: architect-as-orchestrator with GPT-5.6 Luna and Grok 4.6 implementation lanes split 50/50, Claude Opus 5 review, a GPT-6 Astra peer/lead, and a Fable 5.1 commitment-boundary advisor."
+  },
+  "owner": {
+    "name": "Ricardo Suman",
+    "url": "https://github.com/ricardosuman"
+  },
+  "plugins": [
+    {
+      "name": "maestro",
+      "source": "./",
+      "description": "Architect-as-orchestrator: your Fable 5.1 session routes day-to-day implementation 50/50 to GPT-5.6 Luna and Grok 4.6 lanes it drives directly, has Claude Opus 5 review every diff, escalates heavy code to Opus 5 high, and can hand a whole objective to GPT-6 Astra."
+    }
+  ]
+}
