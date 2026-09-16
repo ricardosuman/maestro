@@ -2,67 +2,91 @@
 
 Maestro started as an adaptation of [DannyMac180/fable-advisor](https://github.com/DannyMac180/fable-advisor) (MIT) and has since been rewritten around its own doctrine.
 
-The current doctrine:
+## What it is
 
-- **`luna-lane` skill** — day-to-day implementation lane (GPT-5.6 Luna at effort `max`, via `codex exec`). The architect launches `codex` itself from Bash; no Claude subagent is involved
-- **`grok-lane` skill** — the other day-to-day lane (Grok 4.6 at effort `medium`, via the Grok CLI), launched the same way
-- **`astra-lead` skill** — a whole objective delegated to GPT-6 Astra (high) as the lead: it decomposes, implements and verifies end to end
-- **`grok-research` skill** — read-only investigation (Grok 4.6 medium, plan mode); falls back to `opus-researcher`
-- **`opus-heavy-implementer`** — heavy implementation lane (Claude Opus 5, high) for complex algorithms, concurrency, migrations, many-file changes
-- **`opus-implementer`** — fallback implementation lane (Claude Opus 5, medium) when luna or grok is rate-limited/unavailable
-- **`opus-reviewer`** — read-only reviewer (Claude Opus 5, medium) for every luna/grok diff; re-runs the spec's verification
-- **`opus-researcher`** — research fallback (Claude Opus 5, medium), read-only
-- **`codex-peer`** — cross-vendor *discussion* peer and reviewer (GPT-6 Astra via the Codex CLI); analyzes and gives verdicts, never implements
-- **`advisor`** — commitment-boundary advisor (Fable 5.1, high) and final reviewer of Astra-led work; advises only
-- **`sonnet-implementer`** — kept for manual use; **not routed** by the doctrine
-- **`orchestration` skill** — the architect-as-orchestrator routing doctrine and five-part spec contract
+Maestro turns a Claude Code session into an architect-orchestrator: the session decomposes the problem, writes specs, routes the actual typing to other models, and judges the verification evidence — it almost never writes the code itself. Implementation goes to cheaper or external lanes (GPT-5.6 Luna and Grok 4.6 by default, Claude Opus or Sonnet as fallback), each launched from a spec with its own reviewer checking the diff before the architect accepts it. The point is cost: keep the expensive model (Fable 5.1) for judgment — decomposition, interface design, routing, and reading reviews — and spend cheaper or external tokens on volume.
 
-Every lane passes its model *and* its effort explicitly — CLI config defaults never decide a lane's effort.
+## Who this is for
 
-### Routing: 50/50 luna/grok, opus review, EXTERNAL-ONLY mode
+This is tuned to my own setup and subscriptions: a Claude subscription used from Claude Code (the session runs Fable 5.1; Opus/Sonnet lanes), an OpenAI subscription used through the Codex CLI (GPT-5.6 Luna and GPT-6 Astra lanes), and an xAI Grok subscription used through the Grok Build CLI (Grok 4.6 lanes). If you don't have one of these, the corresponding lanes report `unavailable` and the doctrine falls back as documented below. Nothing here is a benchmark or a recommendation; it is the routing that keeps my weekly Claude limit alive.
 
-Day-to-day implementation (simple to reasonably complex, plus all cheap work) is split **50/50 between `luna-lane` (Luna at `max`) and `grok-lane` (Grok 4.6 at `medium`)**; the architect keeps a running `lanes: luna N / grok M` tally and corrects toward 50/50 when it drifts. Prefer grok when wall-clock matters (Luna averages ~100 agent steps), luna for cheap volume work. Heavy code goes to `opus-heavy-implementer`, outside the tally.
+## How work is routed
 
-Every luna/grok diff goes to **`opus-reviewer`** before the architect accepts it: it reads the diff, re-runs the spec's verification command and returns `ship`/`fix` with `file:line` findings. Diffs from the opus lanes go to `codex-peer` instead — the reviewer is never the implementer's own vendor. Final review of a multi-step deliverable: Fable-led → `codex-peer`, Astra-led → `advisor`; never both, never neither.
+| Lane | Runs | Claude subagent? | Used when |
+|---|---|---|---|
+| `maestro:luna-lane` skill | GPT-5.6 Luna, effort `max`, via `codex exec` | No — architect launches `codex` directly from Bash | Half of day-to-day/cheap work; slow (~100 steps) but cheap |
+| `maestro:grok-lane` skill | Grok 4.6, effort `medium`, via the Grok CLI | No — architect launches `grok` directly from Bash | The other half of day-to-day work; preferred when wall-clock matters |
+| `maestro:astra-lead` skill | GPT-6 Astra, effort `high`, via `codex exec` | No — architect launches `codex` directly from Bash | A whole self-contained objective with a command that proves it done, on request, or in EXTERNAL-ONLY mode; followed by mandatory `advisor` final review |
+| `maestro:grok-research` skill | Grok 4.6, effort `medium`, plan mode (read-only) | No | Investigating a question across code/docs/web; falls back to `opus-researcher` |
+| `maestro:opus-heavy-implementer` agent | Claude Opus 5, effort `high` | Yes | Complex algorithms, concurrency, migrations, security-sensitive code, many-file changes. Outside the tally; diff reviewed by `codex-peer` |
+| `maestro:opus-implementer` agent | Claude Opus 5, effort `medium` | Yes | Fallback when luna/grok is unavailable, or on explicit request; diff reviewed by `codex-peer` |
+| `maestro:opus-reviewer` agent | Claude Opus 5, effort `medium` | Yes | Reviews every luna/grok diff: reads `git diff`, re-runs the spec's verification, returns ship/fix |
+| `maestro:opus-researcher` agent | Claude Opus 5, effort `medium` | Yes | Research fallback when `grok-research` is unavailable; read-only |
+| `maestro:codex-peer` agent | GPT-6 Astra, high reasoning, via `codex exec` (wrapper model: haiku) | Yes (thin forwarder) | Cross-vendor discussion/second opinion; reviews `opus-implementer`/`opus-heavy-implementer` diffs and Fable-led final deliverables |
+| `maestro:advisor` agent | Fable 5.1, effort `high` | Yes | Commitment-boundary decisions; mandatory final review of Astra-led work |
+| `maestro:sonnet-implementer` agent | Claude Sonnet 5, effort `medium` | Yes | Not routed by the doctrine — kept for manual use only |
 
-When a lane reports unavailable / rate-limited / timed out (non-zero exit, or `429`, `402 Payment Required`, an exhausted balance, a quota or login error), it is marked unavailable for the rest of the session and announced once; its share moves to the other external lane and the 50/50 tally is paused while one lane is down. `opus-implementer`, reviewed by `codex-peer`, is used only when both external lanes are unavailable, or when the user explicitly accepts a Claude lane for a time-critical spec because only the slow lane is left; research falls back to `opus-researcher`.
+Day-to-day implementation (simple to reasonably complex, plus all cheap work) splits **50/50 between the luna and grok lanes**; the architect keeps a running `lanes: luna N / grok M` tally and corrects toward 50/50 as it drifts, preferring grok when wall-clock matters and luna for cheap volume work. Heavy code goes to `opus-heavy-implementer`, outside that tally. Every luna/grok diff goes to `opus-reviewer` before it's accepted — it re-runs the spec's verification command and returns ship/fix; diffs from the opus lanes go to `codex-peer` instead, so the reviewer is never the implementer's own vendor. Once the Claude 5-hour usage window hits 75%, mode flips to **EXTERNAL-ONLY**: all implementation runs through luna, grok and astra, and a PreToolUse gate denies the opus/sonnet lanes outright. When a lane reports unavailable, rate-limited or timed out, its share moves to the other external lane (the 50/50 tally pauses); `opus-implementer` is used only when both external lanes are down, or the user explicitly accepts a Claude lane for a time-critical spec. The architect itself keeps only decomposition, interface design, spec writing, routing, and judging verification evidence — never the typing.
 
-A statusline script and hooks track how much of the current Claude 5-hour usage window has been consumed and inject a usage note (`maestro usage: … mode: …`) into every prompt. Once that window reaches **75%** (override with the env var `MAESTRO_EXTERNAL_ONLY_AT`; the older `FABLE_ADVISOR_EXTERNAL_ONLY_AT` and `FABLE_ADVISOR_GROK_ONLY_AT` still work as fallbacks), the note flips to `mode: EXTERNAL-ONLY` — the mode previously called `GROK-ONLY`: every implementation task runs through the luna, grok and astra lanes, launched by the architect itself; no Claude implementation subagent is spawned, and a PreToolUse gate denies `opus-implementer`, `opus-heavy-implementer`, `opus-reviewer`, `opus-researcher` and `sonnet-implementer` outright, so reviews go to `codex-peer`. `advisor`, `codex-peer`, and the read-only Explore agent stay available throughout, since the point of the mode is preserving Claude quota for judgment, not shutting the session down. If both grok and codex are unavailable in EXTERNAL-ONLY mode, the architect stops and tells the user instead of silently falling back to a Claude lane.
+## The usage gate
 
-Requires the [Codex CLI](https://github.com/openai/codex) installed and logged in (`codex login`) for `luna-lane`, `astra-lead` and `codex-peer`, and the [Grok CLI](https://x.ai/cli) installed and logged in (`grok login`) for `grok-lane` and `grok-research`.
+A statusline script (`scripts/usage-statusline.sh`) reads Claude Code's rate-limit data on every prompt and records the 5-hour and 7-day usage percentages to `~/.claude/maestro/usage.json`. A hook (`scripts/usage-gate.sh`, wired in `hooks/hooks.json`) reads that file on every `UserPromptSubmit` and injects a `maestro usage: … mode: …` note into the prompt, and on every `PreToolUse` for an `Agent`/`Task` call it denies `opus-implementer`, `opus-heavy-implementer`, `opus-reviewer`, `opus-researcher` and `sonnet-implementer` once the 5-hour window is at or above the threshold. The threshold is set by the env var `MAESTRO_EXTERNAL_ONLY_AT` (default 75; the older `FABLE_ADVISOR_EXTERNAL_ONLY_AT` and `FABLE_ADVISOR_GROK_ONLY_AT` are still accepted as fallbacks). `advisor`, `codex-peer` and the read-only Explore agent are never gated — they stay available in EXTERNAL-ONLY mode because the point of the mode is preserving Claude quota for judgment, not shutting the session down.
 
-The grok lanes call the grok binary by its literal absolute path (never a `$GROK` variable, `~`, or `$HOME`), because Claude Code's Bash permission rules match the literal command text. Add the permission rule printed by `install.sh` (`Bash(<home>/.grok/bin/grok:*)`) to `permissions.allow` in `~/.claude/settings.json` once (or via `/permissions`); the codex lanes need the same treatment for the path `command -v codex` prints.
+## The spec contract and the simplicity block
 
-GPT-5.6 Sol at high/xhigh is a strong third day-to-day option if Codex quota isn't the constraint — it shares that quota with Luna, which is why it isn't wired in.
+Every implementation prompt carries the same five parts, because lanes share none of the architect's conversation context: **objective, files, interfaces, constraints, verification**. The Constraints section always ends with the ponytail simplicity block (`doctrine/ponytail-block.md`) pasted in verbatim, plus the karpathy guidelines block (`doctrine/karpathy-block.md`) — the external lanes don't load this plugin's skills, so both doctrines have to travel inside the spec file itself. The opus agents carry the same ladder directly in their own instructions and apply it even if a spec forgets to paste it.
 
-## Install (any machine — macOS or Linux/Omarchy)
-
-Prereqs: [Claude Code](https://claude.com/claude-code) and git access to this private repo (easiest: `gh auth login && gh auth setup-git`).
+## Install
 
 ```sh
 git clone https://github.com/ricardosuman/maestro.git
 cd maestro && ./install.sh
 ```
 
-Running `./install.sh` adds this repo as a plugin marketplace, installs this plugin and the companion plugins (codex, ponytail, karpathy), and merges the required settings keys into `~/.claude/settings.json`. It installs both managed `CLAUDE.md` sections and can register the Obsidian MCP when run interactively.
+`install.sh` checks that the `claude` and `jq` CLIs are present and that it can reach the (private) repo over git, then: adds this repo as a plugin marketplace and installs the `maestro` plugin; adds and installs the companion plugins (`openai-codex`, `ponytail`, `karpathy-skills`); writes the orchestration doctrine block (`doctrine/CLAUDE-orchestration.md`) and the always-on-skills block into `~/.claude/CLAUDE.md`; copies `scripts/usage-statusline.sh` into `~/.claude/maestro/`; merges `~/.claude/settings.json` (per-model effort levels, a `statusLine` entry pointing at the usage script, and a `permissions.allow` rule for the grok binary); and, when run interactively, offers to register the Obsidian MCP server.
 
-**Restart the Claude Code session after running `install.sh`** — hooks, skills and agents (including the `luna-lane`/`grok-lane`/`astra-lead`/`grok-research` skills and the EXTERNAL-ONLY usage gate) only load on a fresh session. The doctrine assumes the session runs Fable 5.1 at effort high; switch with `/model` if it doesn't.
+The grok lanes call the grok binary by its literal absolute path, so add the permission rule `install.sh` prints — `Bash(/Users/<you>/.grok/bin/grok:*)` — to `permissions.allow` in `~/.claude/settings.json` if it isn't merged automatically. The luna/astra/codex-peer lanes need the [Codex CLI](https://github.com/openai/codex) installed and logged in (`npm i -g @openai/codex`, then `codex login`); the grok/grok-research lanes need the [Grok CLI](https://x.ai/cli) installed and logged in (`grok login`). Without one of these, the corresponding lanes report unavailable and the doctrine's fallback rules apply.
 
-Manual alternative, inside Claude Code:
-
-```
-/plugin marketplace add ricardosuman/maestro
-/plugin install maestro@maestro
-```
-
-…then copy `doctrine/CLAUDE-orchestration.md` into `~/.claude/CLAUDE.md` yourself.
-
-The `luna-lane` and `astra-lead` skills and the `codex-peer` agent need the OpenAI Codex CLI installed and authenticated (`codex login`); without it, day-to-day work runs on grok alone.
-
-### Simplicity doctrine
-
-Every spec's Constraints section ends with the ponytail simplicity block (`doctrine/ponytail-block.md`) and the karpathy guidelines block (`doctrine/karpathy-block.md`) pasted verbatim, so both travel into every lane that doesn't load this plugin's skills. The opus implementer agents carry the same ladder directly and apply it even when a spec forgets to paste it; `opus-reviewer` checks the diff against it.
+**Restart Claude Code (or start a new session)** after installing or updating — hooks, skills and agents only load on a fresh session.
 
 ## Updating
 
-Push changes here, then on each machine: `/plugin marketplace update maestro` (or reinstall).
+Bump the version in `.claude-plugin/plugin.json`, push, then on each machine:
+
+```sh
+claude plugin marketplace update maestro && claude plugin update maestro@maestro
+```
+
+Restart Claude Code afterward.
+
+## Files
+
+```
+.claude-plugin/marketplace.json   plugin marketplace entry
+.claude-plugin/plugin.json        plugin manifest (name, version, description)
+agents/advisor.md                 Fable 5.1 commitment-boundary advisor
+agents/codex-peer.md              cross-vendor discussion peer + reviewer (GPT-6 Astra via Codex CLI)
+agents/opus-heavy-implementer.md  Claude Opus 5 high — heavy/correctness-critical implementation
+agents/opus-implementer.md        Claude Opus 5 medium — fallback implementation
+agents/opus-researcher.md         Claude Opus 5 medium — research fallback
+agents/opus-reviewer.md           Claude Opus 5 medium — reviews every luna/grok diff
+agents/sonnet-implementer.md      Claude Sonnet 5 medium — manual-use simple implementer
+doctrine/CLAUDE-always-on-skills.md   loads ponytail + karpathy skills every session
+doctrine/CLAUDE-orchestration.md      the routing doctrine merged into ~/.claude/CLAUDE.md
+doctrine/karpathy-block.md            karpathy guidelines block pasted into every spec
+doctrine/ponytail-block.md            simplicity ladder block pasted into every spec
+hooks/hooks.json                  wires usage-gate.sh to UserPromptSubmit and PreToolUse
+install.sh                        one-shot installer
+scripts/refresh-doctrine.sh       replaces a doctrine block inside a CLAUDE.md file
+scripts/usage-gate.sh             injects the usage note; denies opus/sonnet in EXTERNAL-ONLY mode
+scripts/usage-statusline.sh       records usage.json and prints the statusline
+skills/astra-lead/SKILL.md        how to hand a whole objective to GPT-6 Astra
+skills/grok-lane/SKILL.md         how to drive the Grok 4.6 day-to-day lane
+skills/grok-research/SKILL.md     how to drive Grok 4.6 read-only research
+skills/luna-lane/SKILL.md         how to drive the GPT-5.6 Luna day-to-day lane
+skills/orchestration/SKILL.md     the full routing doctrine
+```
+
+## License
+
+MIT (see LICENSE).
