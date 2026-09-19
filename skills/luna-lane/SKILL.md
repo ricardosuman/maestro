@@ -79,6 +79,12 @@ mkdir -p /tmp/maestro-lanes; FINAL=$(mktemp /tmp/maestro-lanes/luna.XXXXXX); ech
   < /dev/null > "$FINAL" 2>&1; ec=$?; echo "maestro-exit: $ec" >> "$FINAL"; echo "codex exit: $ec"
 ```
 
+## Dispatching through lane-runner
+
+Dispatching `maestro:lane-runner` with `lane: luna`, the spec file, and the project instead of the Bash launch makes the run appear in Claude Code's native agent list with a transcript.
+It costs a little Claude quota while Haiku waits, and the spec file is written exactly the same way.
+The Bash launch above remains the default; use lane-runner when native agent visibility matters.
+
 Substitute the literal paths from preflight. Drop the `gtimeout` prefix if none was found. `-C` is the project's absolute path, typed out — not `"$(pwd)"` via a variable. Exit 124 means the 30-minute cap fired.
 
 Flag discipline (non-negotiable):

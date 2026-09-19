@@ -32,6 +32,7 @@ The simplest working solution is also the cheapest to verify — simplicity is c
 | Reviewer | Claude Opus 5 (medium effort) | `opus-reviewer` agent | Every luna/grok diff, before the architect accepts it. Read-only; re-runs the spec's verification. |
 | Lead for a whole objective | GPT-6 Astra (high effort) | `astra-lead` skill — the architect launches `codex exec` directly | The objective is self-contained in one repo with a command that proves it done, the user asks for it, or mode is EXTERNAL-ONLY. Astra decomposes and implements it end to end. |
 | Research | Grok 4.6 (medium effort) | `grok-research` skill (read-only, plan mode) | Investigating a question across a codebase, docs or the web. Falls back to the `opus-researcher` agent. |
+| Native agent-list forwarder | External Luna/Astra or Grok/research CLI | `lane-runner` agent — thin Claude Haiku 4.5 foreground forwarder | When the external run should appear in Claude Code's native agent list; forwards `lane`, `spec file`, and `project` without implementing or falling back. |
 | Peer + cross-vendor review | GPT-6 Astra (high effort) | `codex-peer` agent | NOT an implementer. A second opinion on a hard problem, a design trade-off, a diagnosis; the review of an `opus-implementer`/`opus-heavy-implementer` diff; the final review of a Fable-led deliverable. Requires the codex CLI. |
 | Judgment | Fable 5.1 (high effort) | `advisor` agent | Not an implementation lane. Commitment boundaries (below) and the final review of Astra-led work. |
 
