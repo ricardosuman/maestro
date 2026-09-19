@@ -6,6 +6,11 @@ Maestro started as an adaptation of [DannyMac180/fable-advisor](https://github.c
 
 Maestro turns a Claude Code session into an architect-orchestrator: the session decomposes the problem, writes specs, routes the actual typing to other models, and judges the verification evidence — it almost never writes the code itself. Implementation goes to cheaper or external lanes (GPT-5.6 Luna and Grok 4.6 by default, Claude Opus or Sonnet as fallback), each launched from a spec with its own reviewer checking the diff before the architect accepts it. The point is cost: keep the expensive model (Fable 5.1) for judgment — decomposition, interface design, routing, and reading reviews — and spend cheaper or external tokens on volume.
 
+## Lanes band
+
+The optional `maestro-lanes` mod polls `/tmp/maestro-lanes/` and shows each Luna, Grok, Astra, or research run above the prompt with its task suffix, state, elapsed time, and latest output line. Load it with `claude --plugin-dir mods/lanes`, or install `maestro-lanes` from this marketplace. Function hooks are early access.
+Function hooks load only with `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` in the environment (e.g. `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 claude --plugin-dir mods/lanes`).
+
 ## Who this is for
 
 This is tuned to my own setup and subscriptions: a Claude subscription used from Claude Code (the session runs Fable 5.1; Opus/Sonnet lanes), an OpenAI subscription used through the Codex CLI (GPT-5.6 Luna and GPT-6 Astra lanes), and an xAI Grok subscription used through the Grok Build CLI (Grok 4.6 lanes). If you don't have one of these, the corresponding lanes report `unavailable` and the doctrine falls back as documented below. Nothing here is a benchmark or a recommendation; it is the routing that keeps my weekly Claude limit alive.

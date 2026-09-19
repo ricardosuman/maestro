@@ -53,11 +53,11 @@ Never a fixed path — parallel research runs on a fixed path corrupt each other
 Launch from the Bash tool with `run_in_background: true`. Echo `$FINAL` first so you still have the path when the background task completes.
 
 ```bash
-FINAL=$(mktemp -t grok-research-final.XXXXXX); echo "$FINAL"
+mkdir -p /tmp/maestro-lanes; FINAL=$(mktemp /tmp/maestro-lanes/research.XXXXXX); echo "$FINAL"
 /opt/homebrew/bin/gtimeout 900 /Users/<you>/.grok/bin/grok --prompt-file "$Q" \
   -m grok-4.6 --reasoning-effort medium \
   --permission-mode plan --output-format plain --no-subagents \
-  --cwd /abs/path/to/project < /dev/null > "$FINAL" 2>&1; echo "grok exit: $?"
+  --cwd /abs/path/to/project < /dev/null > "$FINAL" 2>&1; ec=$?; echo "maestro-exit: $ec" >> "$FINAL"; echo "grok exit: $ec"
 ```
 
 Substitute the literal paths from preflight. Drop the `gtimeout` prefix if none was found. Exit 124 means the fifteen-minute cap fired.

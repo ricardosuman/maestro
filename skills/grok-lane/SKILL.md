@@ -71,11 +71,11 @@ If parts of the five-part spec are missing, pass the gap to grok as an explicit 
 Launch from the Bash tool with `run_in_background: true`. Echo `$FINAL` first so you still have the path when the background task completes.
 
 ```bash
-FINAL=$(mktemp -t grok-final.XXXXXX); echo "$FINAL"
+mkdir -p /tmp/maestro-lanes; FINAL=$(mktemp /tmp/maestro-lanes/grok.XXXXXX); echo "$FINAL"
 /opt/homebrew/bin/gtimeout 1800 /Users/<you>/.grok/bin/grok --prompt-file "$SPEC" \
   -m grok-4.6 --reasoning-effort medium \
   --permission-mode auto --output-format plain --no-subagents \
-  --cwd /abs/path/to/project < /dev/null > "$FINAL" 2>&1; echo "grok exit: $?"
+  --cwd /abs/path/to/project < /dev/null > "$FINAL" 2>&1; ec=$?; echo "maestro-exit: $ec" >> "$FINAL"; echo "grok exit: $ec"
 ```
 
 Substitute the literal paths from preflight. Drop the `gtimeout` prefix if none was found. `--cwd` is the project's absolute path, typed out — not `"$(pwd)"` via a variable. Exit 124 means the 30-minute cap fired.

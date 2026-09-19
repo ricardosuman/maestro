@@ -63,12 +63,12 @@ where `$PLUGIN` is the installed plugin root. `codex exec` has no `--prompt-file
 Launch from the Bash tool with `run_in_background: true`. Echo `$FINAL` first so you still have the path when the background task completes.
 
 ```bash
-FINAL=$(mktemp -t astra-final.XXXXXX); echo "$FINAL"
+mkdir -p /tmp/maestro-lanes; FINAL=$(mktemp /tmp/maestro-lanes/astra.XXXXXX); echo "$FINAL"
 /opt/homebrew/bin/gtimeout 3600 /Users/<you>/.nvm/versions/node/<v>/bin/codex exec \
   --model gpt-6-astra -c model_reasoning_effort=high \
   --sandbox workspace-write -c approval_policy=never --skip-git-repo-check \
   -C /abs/path/to/project "$(cat "$BRIEF")" \
-  < /dev/null > "$FINAL" 2>&1; echo "codex exit: $?"
+  < /dev/null > "$FINAL" 2>&1; ec=$?; echo "maestro-exit: $ec" >> "$FINAL"; echo "codex exit: $ec"
 ```
 
 Substitute the literal paths from preflight. Drop the `gtimeout` prefix if none was found. `-C` is the project's absolute path, typed out. Exit 124 means the one-hour cap fired.

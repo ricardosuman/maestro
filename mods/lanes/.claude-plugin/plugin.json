@@ -1,0 +1,8 @@
+{
+  "name": "maestro-lanes",
+  "version": "0.1.0",
+  "description": "Shows Maestro external lane runs above the prompt.",
+  "author": {
+    "name": "Ricardo Suman"
+  }
+}

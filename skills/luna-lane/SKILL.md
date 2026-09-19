@@ -71,12 +71,12 @@ SPEC_EOF
 Launch from the Bash tool with `run_in_background: true`. Echo `$FINAL` first so you still have the path when the background task completes.
 
 ```bash
-FINAL=$(mktemp -t luna-final.XXXXXX); echo "$FINAL"
+mkdir -p /tmp/maestro-lanes; FINAL=$(mktemp /tmp/maestro-lanes/luna.XXXXXX); echo "$FINAL"
 /opt/homebrew/bin/gtimeout 1800 /Users/<you>/.nvm/versions/node/<v>/bin/codex exec \
   --model gpt-5.6-luna -c model_reasoning_effort=max \
   --sandbox workspace-write -c approval_policy=never --skip-git-repo-check \
   -C /abs/path/to/project "$(cat "$SPEC")" \
-  < /dev/null > "$FINAL" 2>&1; echo "codex exit: $?"
+  < /dev/null > "$FINAL" 2>&1; ec=$?; echo "maestro-exit: $ec" >> "$FINAL"; echo "codex exit: $ec"
 ```
 
 Substitute the literal paths from preflight. Drop the `gtimeout` prefix if none was found. `-C` is the project's absolute path, typed out — not `"$(pwd)"` via a variable. Exit 124 means the 30-minute cap fired.

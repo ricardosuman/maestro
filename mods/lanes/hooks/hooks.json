@@ -1,0 +1,4 @@
+{
+  "description": "Shows Maestro Luna, Grok, Astra and research lane runs in the AbovePrompt band",
+  "modules": ["./register.ts"]
+}
